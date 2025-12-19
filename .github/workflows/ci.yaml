@@ -52,6 +52,7 @@ jobs:
         push: true
         tags: |
           ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:${{ github.sha }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:latest
 
     # =========================
     # Security Scanning

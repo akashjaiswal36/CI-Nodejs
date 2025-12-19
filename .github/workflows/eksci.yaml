@@ -121,7 +121,7 @@ jobs:
         git clone https://x-access-token:${{ secrets.GITOPS_REPO_TOKEN }}@github.com/akashjaiswal36/CD-GitOps.git
         cd CD-GitOps/helm/devops-akki
 
-        sed -i 's/tag:.*/tag: ${{ github.sha }}/' values.yaml
+        sed -i 's/tag:.*/tag: ${{ github.sha }}/' values-eks.yaml
 
         git add values.yaml
         git commit -m "update image tag to ${{ github.sha }}"
