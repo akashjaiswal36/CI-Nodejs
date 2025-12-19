@@ -17,6 +17,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # ===========================
+    # Secret Scanning with GitLeaks
+    # ============================
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        fail: true
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
