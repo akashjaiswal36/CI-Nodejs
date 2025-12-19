@@ -123,7 +123,7 @@ jobs:
 
         sed -i 's/tag:.*/tag: ${{ github.sha }}/' values-eks.yaml
 
-        git add values.yaml
+        git add values-eks.yaml
         git commit -m "update image tag to ${{ github.sha }}"
         git push
     
