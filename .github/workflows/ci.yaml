@@ -32,9 +32,46 @@ jobs:
         context: .
         push: true
         tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:latest
           ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:${{ github.sha }}
 
+    # =========================
+    # Security Scanning
+    # =========================
+    - name: Install Trivy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget
+        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.1_Linux-64bit.deb
+        sudo dpkg -i trivy_0.50.1_Linux-64bit.deb
+    # ===============================================
+    # Scan image for HIGH / Critical velnerbilities
+    # ===============================================
+    - name: Trivy Image Scan (fail if High or Critical)
+      run: |
+        trivy image --severity HIGH,CRITICAL --exit-code 1 \
+        ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:${{ github.sha }}
+
+    # ====================
+    # SBOM Generation
+    # ====================
+
+    # Generate SBOM (CycloneDX format)
+    - name: Generate SBOM
+      run: |
+        trivy image --format cyclonedx --output sbom.json \
+        ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:${{ github.sha }}
+
+    # Upload SBOM as CI artifact
+    - name: upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: sbom.json
+
+    # ===================================
+    #  GITOPS UPDATE (ONLY IF ALL ABOVE PASSES)
+    # ===================================
+    
     - name: Update GitOps repo with new image tag
       run: |
         git config --global user.email "ci-bot@github.com"
