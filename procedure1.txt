@@ -1,0 +1,1389 @@
+📁 STEP 1: Create Application Repository
+
+📦 Repo name
+
+devops-platform-nodejs-app
+
+📂 Final Folder Structure (STEP 1)
+
+devops-platform-nodejs-app/
+├── src/
+│   ├── app.js
+│   └── routes/
+│       ├── ui.js
+│       ├── health.js
+│       └── version.js
+├── package.json
+├── Dockerfile
+├── .dockerignore
+└── README.md
+
+🧠 STEP 2: Application Code (VERY SIMPLE)
+
+📄 package.json
+
+{
+  "name": "devops-platform-demo",
+  "version": "1.0.0",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
+------------------------------
+
+📄 src/app.js
+
+const express = require('express');
+const app = express();
+
+app.use('/', require('./routes/ui'));
+app.use('/health', require('./routes/health'));
+app.use('/version', require('./routes/version'));
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 App running on port ${PORT}`);
+});
+-----------------------------------
+
+📄 src/routes/health.js
+
+const router = require('express').Router();
+
+router.get('/', (req, res) => {
+  res.json({
+    version: process.env.APP_VERSION || 'v1',
+    environment: process.env.ENV || 'dev'
+  });
+});
+
+module.exports = router;
+-------------------------------------
+
+📄 src/routes/ui.js ✅ (This is your WEBPAGE)
+
+const router = require('express').Router();
+const os = require('os');
+
+router.get('/', (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>DevOps Platform Demo</title>
+        <style>
+          body { font-family: Arial; background: #eef2f7; padding: 40px; }
+          .card {
+            background: white;
+            padding: 20px;
+            width: 420px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>🚀 DevOps Platform Demo</h2>
+          <p><b>Status:</b> UP</p>
+          <p><b>Version:</b> ${process.env.APP_VERSION || 'v1'}</p>
+          <p><b>Environment:</b> ${process.env.ENV || 'dev'}</p>
+          <p><b>Pod / Host:</b> ${os.hostname()}</p>
+          <p><b>Time:</b> ${new Date().toISOString()}</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+module.exports = router;
+--------------------------------------------
+▶️ STEP 3: Run Locally (TEST IT)
+
+npm install
+npm start
+
+Open browser:
+http://localhost:3000
+
+http://localhost:3000/health
+http://localhost:3000/version
+
+
+--------------------------------
+🐳 STEP 4: Dockerize the App
+📄 Dockerfile
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --only=production
+
+COPY src ./src
+
+EXPOSE 3000
+CMD ["node", "src/app.js"]
+---------------------------------
+📄 .dockerignore
+
+node_modules
+npm-debug.log
+
+----------------------------------
+▶️ Test Container Locally
+docker build -t devops-demo .
+docker run -p 3000:3000 devops-demo
+
+http://localhost:3000
+----------------------------------
+
+▶️ STEP 3: Build the Image (Windows)
+
+Open PowerShell or Git Bash in the project folder:
+
+docker build -t devops-demo .
+
+
+▶️ STEP 4: Run the Container
+docker run -p 3000:3000 devops-demo
+u sud see:
+🚀 App running on port 3000
+and open webpage:
+http://localhost:3000
+
+===================================================
+📁 STEP 1B — Create Kubernetes Manifests
+
+Inside your project root, create a new folder:
+
+devops-platform-nodejs-app/
+└── k8s/
+    ├── deployment.yaml
+    └── service.yaml
+
+📄 k8s/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: devops-demo
+  template:
+    metadata:
+      labels:
+        app: devops-demo
+    spec:
+      containers:
+      - name: devops-demo
+        image: devops-demo:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        env:
+        - name: APP_VERSION
+          value: "v1"
+        - name: ENV
+          value: "local"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 20
+----------------------
+readinessProbe → safe traffic routing
+
+livenessProbe → self-healing pods
+
+Env vars → visible on webpage
+-----------------------------------------
+📄 k8s/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-demo-service
+spec:
+  type: NodePort
+  selector:
+    app: devops-demo
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30007
+-------------------------------------------------
+▶️ STEP 1C — Deploy to Kubernetes
+kubectl apply -f k8s/
+kubectl get pods
+kubectl get svc
+
+==================================
+🚀 STEP 2 — HELM (This is a BIG step)
+
+📁 STEP 2A — Create Helm Chart Structure
+
+From your project root:
+mkdir helm
+cd helm
+helm create devops-demo
+
+Now your structure will look like:
+
+devops-platform-nodejs-app/
+├── helm/
+│   └── devops-demo/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           ├── _helpers.tpl
+│           └── ingress.yaml
+--------------------------------------
+
+🧹 STEP 2B — Clean Up Default Helm Files
+
+Delete files we don’t need right now:
+templates/hpa.yaml
+templates/tests/
+
+-------------------------------------
+📄 STEP 2C — Update Chart.yaml
+
+apiVersion: v2
+name: devops-demo
+description: DevOps Platform Demo Application
+type: application
+version: 0.1.0
+appVersion: "1.0"
+------------------------------
+
+📄 STEP 2D — Update values.yaml
+
+replicaCount: 2
+
+image:
+  repository: devops-demo
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 80
+
+env:
+  APP_VERSION: "v1"
+  ENV: "local"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+------------------------------------------------
+📄 STEP 2E — Update templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devops-demo.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "devops-demo.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "devops-demo.name" . }}
+    spec:
+      containers:
+        - name: devops-demo
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+          env:
+            - name: APP_VERSION
+              value: "{{ .Values.env.APP_VERSION }}"
+            - name: ENV
+              value: "{{ .Values.env.ENV }}"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+-------------------------------------------
+
+📄 STEP 2F — Update templates/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devops-demo.fullname" . }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "devops-demo.name" . }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 3000
+---------------------------------------
+
+▶️ STEP 2G — Deploy Using Helm
+
+From project root:
+
+helm install devops-demo ./helm/devops-demo
+
+Check:
+kubectl get pods
+kubectl get svc
+http://localhost
+----------------------------------------------
+
+🚀 NEXT STEP (VERY IMPORTANT)
+
+👉 STEP 3 — GitOps with ArgoCD
+
+This is where your project becomes enterprise-grade.
+
+When ready, reply:
+
+“Start Step 3 (GitOps)”
+-----------------------------------------------
+🔁 STEP 2 — Retry Helm Install
+
+helm install devops-demo ./helm/devops-demo
+
+---------------------------------------------
+🧪 STEP 3 — Verify
+kubectl get pods
+kubectl get svc
+
+-------------------------------
+📁 Your Helm Chart Structure (What each file does)
+
+helm/devops-demo/
+├── Chart.yaml        ← Chart metadata (name, version)
+├── values.yaml       ← All configurable values
+└── templates/
+    ├── deployment.yaml ← Template, not raw YAML
+    └── service.yaml    ← Template, not raw YAML
+----------------------------------------
+
+📄 values.yaml (MOST IMPORTANT FILE)
+
+replicaCount: 2
+
+image:
+  repository: devops-demo
+  tag: latest
+
+env:
+  APP_VERSION: "v1"
+  ENV: "local"
+
+------------------
+2️⃣ Upgrade the release
+helm upgrade devops-demo ./helm/devops-demo
+🔹 Check revision history
+helm history devops-demo
+
+🔙 How to ROLLBACK 
+If something goes wrong:
+helm rollback devops-demo 1
+
+❌ How to REMOVE the app
+helm uninstall devops-demo
+
+🧪 How to SEE what Helm actually applies (VERY USEFUL)
+
+To reduce confusion, run:
+helm template devops-demo ./helm/devops-demo
+
+🔹 Case 4: You want a CLEAN redeploy (start fresh)
+Step 1: Uninstall
+helm uninstall devops-demo
+Step 2: Install again
+helm install devops-demo ./helm/devops-demo
+=========================================
+
+👉 STEP 3 — GitOps with ArgoCD
+
+Separate deployment repo
+
+Auto-sync
+
+Git-based rollback
+
+
+📁 STEP 3A — Create GitOps Repository (NEW REPO)
+
+Create a new repo (important separation):
+
+📦 Repo name:
+devops-platform-gitops
+
+Folder structure (very important)
+devops-platform-gitops/
+├── apps/
+│   └── devops-demo/
+│       ├── application.yaml
+│       └── values.yaml
+└── README.md
+----
+👉 No Dockerfile, no app code here
+👉 Only deployment configuration
+
+This separation is platform best practice.
+
+⚙️ STEP 3B — Install ArgoCD (Local Cluster)
+
+Run this once:
+kubectl create namespace argocd
+
+kubectl apply -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl get pods -n argocd
+
+🔐 Access ArgoCD UI
+
+Port-forward:
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+https://localhost:8080
+Login:
+
+Username: admin
+
+Get password:
+kubectl get secret argocd-initial-admin-secret \
+  -n argocd -o jsonpath="{.data.password}" | base64 -d
+
+📄 STEP 3C — Create ArgoCD Application (CORE FILE)
+
+📄 apps/devops-demo/application.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-demo
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/<YOUR_GITHUB_USERNAME>/devops-platform-nodejs-app
+    targetRevision: main
+    path: helm/devops-demo
+    helm:
+      valueFiles:
+        - values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+--------------------------------
+
+📄 STEP 3D — GitOps Values File
+
+📄 apps/devops-demo/values.yaml
+
+replicaCount: 2
+
+image:
+  repository: devops-demo
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 80
+
+env:
+  APP_VERSION: "v1-gitops"
+  ENV: "gitops"
+-----------------------------
+
+▶️ STEP 3E — Apply the ArgoCD Application
+
+From your machine:
+kubectl apply -f apps/devops-demo/application.yaml
+
+--------------------------------------------
+👉 PUSH YOUR LOCAL CODE TO GITHUB
+
+After that, ArgoCD can watch Git and deploy automatically.
+
+----------------------------------------------------
+
+🔄 STEP 3.4 — Update ArgoCD to Point to GitHub
+
+In application.yaml, ensure:
+
+source:
+  repoURL: https://github.com/<YOUR_GITHUB_USERNAME>/devops-platform-nodejs-app
+  path: helm/devops-demo
+
+kubectl apply -f apps/devops-demo/application.yaml
+--------------------------------------------------------
+Pattern A (Enterprise / Recommended)
+Repo 1: devops-platform-nodejs-app
+  └── helm/devops-demo
+
+Repo 2: devops-platform-gitops
+  └── apps/devops-demo/application.yaml
+-----------------------------------------------------------
+
+🧩 The FULL, REAL-WORLD FLOW (THIS IS KEY)
+
+Here’s the complete DevOps pipeline you are building toward:
+
+Developer
+  ↓ git push
+GitHub (App Repo)
+  ↓
+CI Pipeline (GitHub Actions)
+  - Build Docker image
+  - Push to registry (ECR)
+  - Update image tag in Git
+  ↓
+GitHub (GitOps Repo)
+  ↓
+ArgoCD
+  ↓
+Kubernetes
+----------------------------------------------
+
+🔐 STEP 4B — Add GitHub Secrets (VERY IMPORTANT)
+
+In your GitHub app repo:
+
+GitHub → Repo → Settings → Secrets → Actions
+
+Add:
+
+Secret Name	Value
+DOCKERHUB_USERNAME	your Docker Hub username
+DOCKERHUB_TOKEN	Docker Hub Access Token
+
+👉 Create token from Docker Hub → Account Settings → Security → Access Tokens
+--------------------------------------------------------------------------------
+📁 STEP 4C — Add GitHub Actions Workflow
+
+Create this file in your app repo:
+.github/workflows/ci.yml
+
+ci.yaml file:
+
+name: CI - Build & Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/devops-demo:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/devops-demo:${{ github.sha }}
+================================================================================
+
+🔄 STEP 4E — Update Helm to Use Docker Hub Image
+
+Update values.yaml in Helm:
+
+image:
+  repository: <dockerhub-username>/devops-demo
+  tag: latest
+  pullPolicy: Always
+
+----------------------------------------------------
+
+🔐 Repository Secrets vs Environment Secrets (GitHub Actions)
+
+Repo → Settings → Secrets → Actions → Repository secrets
+
+2️⃣ Environment Secrets (dev / qa / prod)
+Repo → Settings → Environments → dev / prod → Secrets
+
+------------------------------------------------
+
+🔍 Key Differences (SAVE THIS)
+Feature	            Repository Secret	        Environment Secret
+Scope	            Whole repo	                 Specific env
+Approval gates	    ❌ No	                   ✅ Yes
+Per-env values	    ❌ No	                   ✅ Yes
+Best for	        Common creds	              Prod secrets
+Security level	     Medium	                         High
+
+----------------------------------------------------------------------------
+
+
+📁 STEP 5C — GitOps Repo Structure (Confirm)
+
+Your GitOps repo should have:
+
+devops-platform-gitops/
+└── apps/
+    └── devops-demo/
+        └── values.yaml
+
+Example values.yaml:
+
+image:
+  repository: yourdockerhub/devops-demo
+  tag: latest
+---------------------------------------------------
+📄 STEP 5D — Update CI Workflow (IMPORTANT)
+
+Edit your existing .github/workflows/ci.yml
+Add this AFTER Docker push step.
+
+✅ Add this job step (COPY EXACTLY)
+
+    - name: Update GitOps repo with new image tag
+      run: |
+        git config --global user.email "ci-bot@github.com"
+        git config --global user.name "ci-bot"
+
+        git clone https://x-access-token:${{ secrets.GITOPS_REPO_TOKEN }}@github.com/<YOUR_GITHUB_USERNAME>/devops-platform-gitops.git
+        cd devops-platform-gitops/apps/devops-demo
+
+        sed -i "s/tag:.*/tag: ${GITHUB_SHA}/" values.yaml
+
+        git add values.yaml
+        git commit -m "Update image tag to ${GITHUB_SHA}"
+        git push
+================================================================
+
+🚀 STEP 3 (FINAL): Apply ArgoCD Application (True GitOps)
+
+You already created this file:
+
+devops-platform-gitops/apps/devops-demo/application.yaml
+
+👉 Run this from your local machine:
+kubectl apply -f apps/devops-demo/application.yaml
+
+----------------------------------------
+
+🔐 Step 5A — Confirm Secret Exists
+
+In APP repo → Settings → Secrets → Actions
+Make sure this exists:
+
+GITOPS_REPO_TOKEN
+
+-------------------------------
+📄 Step 5B — Update CI Workflow (FINAL VERSION)
+
+Edit this file in app repo:
+.github/workflows/ci.yml
+
+    - name: Update GitOps repo with new image tag
+      run: |
+        git config --global user.email "ci-bot@github.com"
+        git config --global user.name "ci-bot"
+
+        git clone https://x-access-token:${{ secrets.GITOPS_REPO_TOKEN }}@github.com/akashjaiswal36/devops-platform-gitops.git
+        cd devops-platform-gitops/apps/devops-demo
+
+        sed -i "s/tag:.*/tag: ${GITHUB_SHA}/" values.yaml
+
+        git add values.yaml
+        git commit -m "Update image tag to ${GITHUB_SHA}"
+        git push
+--------------------------------------
+
+🧹 STEP 1 — Delete the OLD ArgoCD Application (important)
+
+Your old Application is still pointing to the app repo.
+kubectl delete application devops-demo -n argocd
+
+✅ STEP 2 — Apply the NEW GitOps Application
+
+Now apply the Application that lives in GitOps repo:
+
+kubectl apply -f devops-platform-gitops/apps/devops-demo/application.yaml
+
+This file must contain:
+source:
+  repoURL: https://github.com/akashjaiswal36/devops-platform-gitops
+  path: apps/devops-demo
+  helm:
+    valueFiles:
+      - values.yaml
+✅ FINAL, CORRECT Application.yaml (COPY THIS)
+
+📄 apps/devops-demo/application.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-demo
+  namespace: argocd
+spec:
+  project: default
+
+  sources:
+    # 1️⃣ Helm chart source (App repo)
+    - repoURL: https://github.com/akashjaiswal36/devops-platform-nodejs-app
+      targetRevision: main
+      path: helm/devops-demo
+      helm:
+        valueFiles:
+          - $values/apps/devops-demo/values.yaml
+
+    # 2️⃣ Values source (GitOps repo)
+    - repoURL: https://github.com/akashjaiswal36/devops-platform-gitops
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+------------------------------------------------------------
+
+kubectl delete application devops-demo -n argocd
+kubectl apply -f apps/devops-demo/application.yaml
+----------------------------------------------------
+
+✅ What is working NOW (final state)
+
+git push (app repo)
+   ↓
+GitHub Actions (CI)
+   - build Docker image
+   - push to Docker Hub
+   - update image tag in GitOps repo
+   ↓
+GitHub (GitOps repo)
+   ↓
+ArgoCD
+   - detects Git change
+   - pulls Helm chart from app repo
+   - pulls values from GitOps repo
+   - deploys to Kubernetes
+-------------------------------------------
+
+🧠 One-screen mental model (remember this)
+Component	              Responsibility
+App repo	             Code + Dockerfile + Helm templates
+CI (GitHub Actions)	        Build & publish images
+GitOps repo	              Deployment intent (image tag, replicas)
+ArgoCD	                   Reconcile Git → Cluster
+Humans	                   Only git push
+
+==================================================
+
+“Explain your CI/CD and GitOps setup.”
+
+“We use GitHub Actions for CI to build immutable Docker images and push 
+them to a registry. The pipeline then updates a separate GitOps repository 
+with the new image tag. ArgoCD continuously watches the GitOps repo and 
+reconciles the Kubernetes cluster state using Helm charts from the application 
+repository. Deployments are fully automated and Git-driven.”
+====================================================================
+
+1️⃣ Canary deployments (Argo Rollouts)
+
+1️⃣ What is Canary Deployment (in real words)
+
+Instead of deploying a new version to 100% users, you:
+
+Deploy to small % first
+
+Observe metrics
+
+Gradually increase traffic
+
+Roll back automatically if things break
+
+Example:
+v1 → 100% traffic
+v2 → 10% → 30% → 60% → 100%
+
+
+If error rate spikes at 30% → rollback automatically
+
+-----------------------------------------------
+4️⃣ STEP-BY-STEP IMPLEMENTATION
+✅ STEP 1 — Install Argo Rollouts Controller
+
+Run once:
+kubectl create namespace argo-rollouts
+kubectl apply -n argo-rollouts \
+  -f https://raw.githubusercontent.com/argoproj/argo-rollouts/stable/manifests/install.yaml
+
+
+Verify:
+kubectl get pods -n argo-rollouts
+
+
+--------------------------------------------------------------
+✅ STEP 2 — Install Rollouts kubectl plugin (optional but useful)
+Windows (PowerShell):
+choco install argo-rollouts
+Or download manually:
+https://github.com/argoproj/argo-rollouts/releases
+
+Verify:
+
+bash
+Copy code
+kubectl argo rollouts version
+
+-----------------------------------------------------------
+
+✅ STEP 3 — Modify Helm Chart (CORE CHANGE)
+
+In app repo:
+
+helm/devops-demo/templates/
+
+❌ Remove / stop using
+deployment.yaml
+
+✅ Create rollout.yaml
+
+📄 helm/devops-demo/templates/rollout.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "devops-demo.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 2
+
+  selector:
+    matchLabels:
+      app: {{ include "devops-demo.name" . }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ include "devops-demo.name" . }}
+    spec:
+      containers:
+      - name: app
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 3000
+        env:
+        - name: APP_VERSION
+          value: "{{ .Values.env.APP_VERSION }}"
+
+  strategy:
+    canary:
+      steps:
+      - setWeight: 10
+      - pause: { duration: 30s }
+      - setWeight: 30
+      - pause: { duration: 30s }
+      - setWeight: 60
+      - pause: { duration: 30s }
+      - setWeight: 100
+-------------------------------------------
+This defines:
+
+10% → pause
+
+30% → pause
+
+60% → pause
+
+100% rollout
+==========================================
+
+✅ STEP 4 — Service stays SAME
+
+Your existing service.yaml remains unchanged.
+
+Argo Rollouts reuses the Service selector.
+
+✅ STEP 5 — Commit & Push (GitOps does the rest)
+git add helm/devops-demo/templates/rollout.yaml
+git commit -m "Add canary deployment using Argo Rollouts"
+git push
+======================================
+
+✅ STEP 6 — Observe the Canary Rollout (VERY IMPORTANT)
+
+Watch rollout live:
+
+kubectl argo rollouts get rollout devops-demo --watch
+
+
+You’ll see:
+
+Step 1/4: setWeight 10
+Paused
+Step 2/4: setWeight 30
+Paused
+...
+-----------------------------------------------------------
+
+5️⃣ Rollback Demo (DO THIS ONCE)
+
+Force a failure:
+
+Break app
+
+Push code
+
+Then:
+
+kubectl argo rollouts abort devops-demo
+
+
+Rollback automatically happens.
+
+----------------------------------------------------------
+
+===========================================================================
+
+🚀 Move Local GitOps Setup → AWS EKS + ECR
+🧠 Big picture (same architecture, different infra)
+
+What stays exactly the same:
+
+App repo (NodeJS + Dockerfile + Helm)
+
+GitOps repo
+
+CI → GitOps update logic
+
+ArgoCD
+
+Argo Rollouts
+
+Canary strategy
+
+What changes:
+
+Docker Hub → Amazon ECR
+
+Local K8s → Amazon EKS
+
+Local access → IAM + IRSA
+
+---------------------------------
+PHASE 1 — Create AWS Foundations (one-time)
+1️⃣ Create ECR repository
+aws ecr create-repository \
+  --repository-name devops-demo \
+  --region ap-south-1
+
+
+Result:
+
+123456789012.dkr.ecr.ap-south-1.amazonaws.com/devops-demo
+
+2️⃣ Create EKS cluster (recommended way)
+
+Use eksctl (industry standard):
+
+eksctl create cluster \
+  --name devops-demo-cluster \
+  --region ap-south-1 \
+  --nodegroup-name ng-default \
+  --node-type t3.medium \
+  --nodes 2
+
+
+This automatically:
+
+Creates VPC
+
+Creates worker nodes
+
+Sets kubeconfig
+
+Verify:
+kubectl get nodes
+
+-------------------------------------------------
+
+PHASE 2 — Install Platform Components on EKS
+3️⃣ Install ArgoCD (same as local)
+kubectl create namespace argocd
+kubectl apply -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+
+Access:
+
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+4️⃣ Install Argo Rollouts
+kubectl create namespace argo-rollouts
+kubectl apply -n argo-rollouts \
+  -f https://raw.githubusercontent.com/argoproj/argo-rollouts/stable/manifests/install.yaml
+
+PHASE 3 — Switch CI from Docker Hub → ECR
+5️⃣ Update GitHub Actions (CI)
+
+Replace Docker Hub steps with ECR login.
+
+Add repo secrets (APP repo)
+
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_REGION=ap-south-1
+AWS_ACCOUNT_ID
+
+CI snippet (IMPORTANT PART)
+- name: Configure AWS credentials
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    aws-region: ap-south-1
+
+- name: Login to Amazon ECR
+  run: |
+    aws ecr get-login-password --region ap-south-1 \
+    | docker login --username AWS \
+      --password-stdin \
+      ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+
+- name: Build & push image
+  run: |
+    IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/devops-demo
+    docker build -t $IMAGE:${GITHUB_SHA} .
+    docker push $IMAGE:${GITHUB_SHA}
+------------------------------------------------
+
+PHASE 4 — Update GitOps values (NO Helm change)
+6️⃣ Update GitOps repo values.yaml
+image:
+  repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/devops-demo
+  tag: <updated by CI>
+
+
+CI already updates tag → no change needed
+
+PHASE 5 — Secure EKS Access (IRSA – VERY IMPORTANT)
+7️⃣ Create IAM Role for EKS (image pull)
+
+In real setups:
+
+Nodes or IRSA role can pull from ECR automatically
+EKS worker nodes already have AmazonEC2ContainerRegistryReadOnly
+
+💬 Interview line:
+
+“EKS worker nodes authenticate to ECR using IAM, not static secrets.”
+
+PHASE 6 — Validate End-to-End
+8️⃣ Push code
+git commit -am "Test EKS deployment"
+git push
+
+
+Watch:
+
+CI builds image → ECR
+GitOps repo updated
+
+ArgoCD syncs
+
+Pods running in EKS
+
+Canary rollout starts
+=========================================================
+
+🎯 Final mental model (lock this in)
+Layer	                              Tool
+Source	                              GitHub
+CI	                                   GitHub Actions
+Registry	                          Amazon ECR
+Orchestration	                      Amazon EKS
+CD	                                    ArgoCD
+Delivery	                           Argo Rollouts
+Security	                              IAM / IRSA
+========================================================
+
+2️⃣ Default EKS behavior (THIS IS WHY IT WORKS AUTOMATICALLY)
+
+When you create an EKS cluster using eksctl or AWS console:
+
+✅ AWS automatically attaches this policy to worker nodes:
+AmazonEC2ContainerRegistryReadOnly
+
+That policy allows:
+
+ecr:GetAuthorizationToken
+
+ecr:BatchGetImage
+
+ecr:GetDownloadUrlForLayer
+
+📌 Result
+Your pods can pull images from ECR without any Kubernetes secret.
+
+That’s why you did not configure docker-registry secrets.
+
+------------------------------------------------------------
+
+3️⃣ Then WHAT is IRSA? (important distinction)
+
+IRSA = IAM Roles for Service Accounts
+
+IRSA is NOT needed for image pulling.
+
+IRSA is needed when:
+
+Pods need to access AWS APIs at runtime
+
+Examples:
+
+S3
+
+Secrets Manager
+
+DynamoDB
+
+SQS
+
+📌 Image pull = node responsibility
+📌 AWS API calls = pod responsibility
+
+------------------------------------------------
+
+5️⃣ IRSA — Step-by-step (REAL IMPLEMENTATION)
+
+We’ll do a real IRSA example (Secrets Manager access).
+
+STEP 5.1 — Enable OIDC provider for EKS
+
+Run once per cluster:
+
+eksctl utils associate-iam-oidc-provider \
+  --cluster devops-demo-cluster \
+  --region ap-south-1 \
+  --approve
+
+
+This allows:
+“Kubernetes service accounts → IAM roles”
+
+STEP 5.2 — Create IAM Policy (example: Secrets Manager)
+
+Create file secrets-policy.json:
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+
+----------------------------
+Create policy:
+
+aws iam create-policy \
+  --policy-name devops-demo-secrets-policy \
+  --policy-document file://secrets-policy.json
+
+  ------------------------------------------------
+  STEP 5.3 — Create IAM Role bound to ServiceAccount (IRSA)
+eksctl create iamserviceaccount \
+  --cluster devops-demo-cluster \
+  --namespace default \
+  --name devops-demo-sa \
+  --attach-policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/devops-demo-secrets-policy \
+  --approve
+
+
+This creates:
+
+IAM role
+
+Trust policy with OIDC
+
+Kubernetes ServiceAccount
+
+Annotation linking both
+
+---------------------------
+
+STEP 5.4 — Use ServiceAccount in your Rollout / Deployment
+
+In your rollout.yaml:
+
+spec:
+  template:
+    spec:
+      serviceAccountName: devops-demo-sa
+      containers:
+      - name: app
+        image: <ECR_IMAGE>
+
+
+That’s it.
+--------------------------------------------------------
+STEP 5.5 — Verify IRSA is working
+
+Exec into pod:
+
+kubectl exec -it <pod-name> -- sh
+
+
+Run:
+
+aws sts get-caller-identity
+
+
+You should see:
+
+AssumedRole/devops-demo-sa
+
+========================================================
+
+✅ FINAL CORRECT rollout.yaml (WITH IRSA)
+
+Copy this and compare with yours 👇
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "devops-demo.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 2
+
+  selector:
+    matchLabels:
+      app: {{ include "devops-demo.name" . }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ include "devops-demo.name" . }}
+    spec:
+      serviceAccountName: devops-demo-sa   # 👈 THIS IS THE ONLY ADDITION
+
+      containers:
+      - name: app
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 3000
+        env:
+        - name: APP_VERSION
+          value: "{{ .Values.env.APP_VERSION }}"
+
+  strategy:
+    canary:
+      steps:
+      - setWeight: 10
+      - pause: { duration: 30s }
+      - setWeight: 30
+      - pause: { duration: 30s }
+      - setWeight: 60
+      - pause: { duration: 30s }
+      - setWeight: 100
+=======================================================
+
+🧪 How to VERIFY IRSA is working (must-do)
+
+After deploying this:
+
+kubectl get pods
+
+
+Pick one pod and run:
+
+kubectl exec -it <pod-name> -- sh
+
+
+Then:
+
+aws sts get-caller-identity
+
+You should see something like:
+
+AssumedRole/devops-demo-sa
+
+================================================
+
+What happened behind the scenes (important)
+
+Your flow just did this:
+
+Code fix pushed
+ → CI built new image (ECR)
+ → GitOps repo updated
+ → ArgoCD synced
+ → Argo Rollouts started canary
+ → New pods became healthy
+ → Rollout completed
