@@ -43,7 +43,7 @@ jobs:
           -Dsonar.projectKey=akashjaiswal36_CI-Nodejs
           -Dsonar.organization=akashjaiswal36
       env:
-        SONAR_TOKEN: ${{ secret.SONAR_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     # ================================
     # AWS OIDC Auth
@@ -113,6 +113,6 @@ jobs:
         sed -i 's/tag:.*/tag: ${{ github.sha }}/' values.yaml
 
         git add values.yaml
-        git commit -m "update image tag to ${{ GITHUB_SHA }}"
+        git commit -m "update image tag to ${{ github.sha }}"
         git push
     
