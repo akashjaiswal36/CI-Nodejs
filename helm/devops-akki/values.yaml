@@ -1,7 +1,7 @@
 replicaCount: 3
 
 image:
-  repository: devops-akki
+  repository: ajs3ra8/devops-akki
   tag: latest
   pullPolicy: IfNotPresent
 
