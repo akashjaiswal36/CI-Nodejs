@@ -1,0 +1,290 @@
+🧩 What You Will Build (High Level)
+
+A production-style DevOps platform for a NodeJS (NestJS-like) backend + React frontend, deployed on EKS, using:
+
+GitHub Actions (CI)
+
+GitOps (Helm + ArgoCD)
+
+AWS (ECR, IAM, S3, Secrets Manager, CloudWatch)
+
+Canary deployments
+
+Security scanning + SBOM
+
+Observability
+
+SLOs & runbooks
+===========================================================
+
+🏗️ Architecture (Explain This in Interview)
+
+Developer
+  ↓ (Git push)
+GitHub Repo
+  ↓
+GitHub Actions (CI)
+  - build
+  - test
+  - scan
+  - SBOM
+  - sign image
+  ↓
+Amazon ECR
+  ↓
+GitOps Repo (Helm values updated)
+  ↓
+ArgoCD
+  ↓
+EKS
+  - Canary Deployment
+  - Auto Rollback
+  ↓
+CloudWatch / Prometheus
+======================================================
+1️⃣ Application Repo
+1️⃣ Application Repo
+
+📦 nodejs-app-repo
+
+nodejs-app-repo/
+├── src/
+│   ├── app.js
+│   ├── routes/
+│   │   └── health.js
+│   └── routes/
+│       └── version.js
+├── test/
+│   └── health.test.js
+├── package.json
+├── Dockerfile
+├── .dockerignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+└── README.md
+-----------------------------------
+2️⃣ GitOps Repo
+
+📦 gitops-deployment-repo
+
+gitops-deployment-repo/
+├── helm/
+│   └── nodejs-app/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       ├── values-dev.yaml
+│       ├── values-prod.yaml
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           ├── hpa.yaml
+│           └── ingress.yaml
+├── namespaces/
+│   ├── dev.yaml
+│   └── prod.yaml
+└── argocd/
+    └── app.yaml
+---------------------------------
+✅ Chart.yaml
+
+apiVersion: v2
+name: nodejs-app
+version: 1.0.0
+
+-------------------------------------
+✅ values.yaml
+image:
+  repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app
+  tag: latest
+
+replicaCount: 2
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+-------------------------------------
+✅ deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      containers:
+      - name: nodejs-app
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+
+---------------------------------
+✅ argocd/app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nodejs-app
+spec:
+  destination:
+    namespace: dev
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/your-org/gitops-deployment-repo
+    path: helm/nodejs-app
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---------------------------------------
+3️⃣ Terraform Platform Repo
+
+📦 terraform-platform-repo
+
+terraform-platform-repo/
+├── modules/
+│   ├── eks/
+│   ├── iam/
+│   └── ecr/
+├── envs/
+│   └── dev/
+│       ├── main.tf
+│       ├── variables.tf
+│       └── backend.tf
+└── README.md
+--------------------------------------
+✅ backend.tf
+terraform {
+  backend "s3" {
+    bucket = "devops-platform-tfstate"
+    key    = "eks/dev.tfstate"
+    region = "ap-south-1"
+    dynamodb_table = "terraform-locks"
+  }
+}
+------------------------------------------
+✅ main.tf (simplified)
+module "eks" {
+  source = "../../modules/eks"
+  cluster_name = "dev-eks"
+}
+
+module "ecr" {
+  source = "../../modules/ecr"
+  repo_name = "nodejs-app"
+}
+===============================================
+🔐 GitHub Actions CI (Very Important)
+
+📄 .github/workflows/ci.yml
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::123456789012:role/github-ci-role
+        aws-region: ap-south-1
+
+    - name: Build Docker Image
+      run: docker build -t nodejs-app:${{ github.sha }} .
+
+    - name: Push to ECR
+      run: |
+        aws ecr get-login-password | docker login --username AWS --password-stdin 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+        docker tag nodejs-app:${{ github.sha }} 123456789012.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:${{ github.sha }}
+        docker push 123456789012.dkr.ecr.ap-south-1.amazonaws.com/nodejs-app:${{ github.sha }}
+===================================================================================
+🧪 HOW YOU TEST THIS PROJECT (Important)
+🧪 Test Type #1: Local Testing
+
+npm install
+node src/app.js
+curl localhost:3000/health
+
+🧪 Test Type #2: Container Test
+
+docker build -t nodejs-app .
+docker run -p 3000:3000 nodejs-app
+curl localhost:3000/version
+
+🧪 Test Type #3: CI Pipeline Test
+
+Push code to GitHub:
+
+Pipeline runs
+
+Image pushed to ECR
+
+GitOps repo updated
+===============================
+🧩 How We Implement It (Very Simple)
+1️⃣ Add a Web Page Route
+📄 src/routes/ui.js
+
+const router = require('express').Router();
+const os = require('os');
+
+router.get('/', (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>DevOps Platform Demo</title>
+        <style>
+          body { font-family: Arial; background: #f4f6f8; padding: 40px; }
+          .card { background: white; padding: 20px; border-radius: 8px; width: 420px; }
+          h2 { color: #2c3e50; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>🚀 Siprahub DevOps Platform Demo</h2>
+          <p><b>Status:</b> UP</p>
+          <p><b>Version:</b> ${process.env.APP_VERSION || 'v1'}</p>
+          <p><b>Environment:</b> ${process.env.ENV || 'dev'}</p>
+          <p><b>Pod:</b> ${os.hostname()}</p>
+          <p><b>Timestamp:</b> ${new Date().toISOString()}</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+module.exports = router;
+====================================================
+2️⃣ Wire It Into the App
+📄 Update src/app.js
+ 
+app.use('/', require('./routes/ui'));
+
