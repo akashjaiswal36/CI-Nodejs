@@ -33,7 +33,9 @@ jobs:
     - name: SonarCloud Scan
       uses: SonarSource/sonarcloud-github-action@v2
       with:
-        projectBaseDir: .
+        args: >
+          -Dsonar.projectKey=akashjaiswal36_CI-Nodejs
+          -Dsonar.organization=akashjaiswal36
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
