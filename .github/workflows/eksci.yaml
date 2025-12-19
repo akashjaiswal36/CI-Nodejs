@@ -1,4 +1,4 @@
-name: CI - Build, Scan & Deploy to EKS via ECR
+name: CI - Build,Scan & Deploy to EKS via ECR
 
 on:
   push:
