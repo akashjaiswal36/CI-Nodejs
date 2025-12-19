@@ -1387,3 +1387,230 @@ Code fix pushed
  → Argo Rollouts started canary
  → New pods became healthy
  → Rollout completed
+
+ ================================================================
+ *****************EKS**********AWS******************************
+ =================================================================
+
+ 3️⃣ Terraform Platform Repo
+
+📦 terraform-platform-repo
+
+terraform-platform-repo/
+├── modules/
+│   ├── eks/
+│   ├── iam/
+│   └── ecr/
+├── envs/
+│   └── dev/
+│       ├── main.tf
+│       ├── variables.tf
+│       └── backend.tf
+└── README.md
+
+
+
+🧠 0️⃣ WHY a separate Terraform Platform Repo exists
+
+💬 BigTech principle:
+
+“Infrastructure lifecycle must be independent of application lifecycle.”
+
+That’s why we split:
+
+Repo	Responsibility
+App repo	Code + CI
+GitOps repo	Deployment intent
+Terraform platform repo	Cloud infrastructure
+
+Terraform:
+
+Creates EKS
+
+Creates ECR
+
+Creates IAM roles
+
+NEVER deploys apps
+
+This separation is very important in interviews.
+
+------------------------------------------------
+
+🧱 2️⃣ MODULE: ECR
+modules/ecr/main.tf
+resource "aws_ecr_repository" "this" {
+  name = var.name
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+}
+------------------------------------------
+modules/ecr/variables.tf
+variable "name" {
+  description = "ECR repository name"
+  type        = string
+}
+
+
+💬 Interview line:
+
+“ECR repositories are encrypted and scanned by default.”
+-------------------------------------------------------
+
+🧱 3️⃣ MODULE: IAM (IRSA-ready)
+
+This module will create:
+
+IAM role
+
+Trust policy for EKS OIDC
+
+Policy attachment
+
+modules/iam/main.tf
+
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "${var.oidc_provider_url}:sub"
+      values   = ["system:serviceaccount:${var.namespace}:${var.service_account}"]
+    }
+  }
+}
+
+resource "aws_iam_role" "this" {
+  name               = var.name
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "attach" {
+  role       = aws_iam_role.this.name
+  policy_arn = var.policy_arn
+}
+----------------------------------------------------------------
+
+modules/iam/variables.tf
+
+variable "name" {}
+variable "policy_arn" {}
+variable "oidc_provider_arn" {}
+variable "oidc_provider_url" {}
+variable "namespace" {}
+variable "service_account" {}
+---------------------------------------------
+🧱 4️⃣ MODULE: EKS
+modules/eks/main.tf
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = var.cluster_name
+  cluster_version = "1.29"
+
+  vpc_id     = var.vpc_id
+  subnet_ids = var.subnet_ids
+
+  eks_managed_node_groups = {
+    default = {
+      desired_size = 2
+      min_size     = 1
+      max_size     = 3
+      instance_types = ["t3.medium"]
+    }
+  }
+}
+-----------------------------------------------------------
+
+modules/eks/variables.tf
+
+variable "cluster_name" {}
+variable "vpc_id" {}
+variable "subnet_ids" {
+  type = list(string)
+}
+💬 Interview line:
+
+“We use managed node groups to offload operational overhead.”
+
+-------------------------------------------------
+
+🌍 5️⃣ ENV: DEV
+
+This is where modules are composed.
+
+envs/dev/backend.tf
+
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-devops"
+    key            = "platform/dev/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+-----------------------------------------------------
+
+envs/dev/main.tf
+
+provider "aws" {
+  region = var.region
+}
+
+module "ecr" {
+  source = "../../modules/ecr"
+  name   = "devops-akki"
+}
+
+module "eks" {
+  source       = "../../modules/eks"
+  cluster_name = "devops-demo-dev"
+  vpc_id       = var.vpc_id
+  subnet_ids   = var.subnet_ids
+}
+----------------------------------------------------
+envs/dev/variables.tf
+
+variable "region" {
+  default = "ap-south-1"
+}
+
+variable "vpc_id" {}
+variable "subnet_ids" {
+  type = list(string)
+}
+===============================================
+
+🔄 6️⃣ How this integrates with your current setup
+Terraform repo
+ → creates EKS, ECR, IAM
+
+CI repo
+ → builds image → pushes to ECR
+
+GitOps repo
+ → references ECR image
+ → ArgoCD deploys to EKS
+
+
+💬 Interview line:
+
+“Terraform provisions infrastructure, GitOps handles application lifecycle.”
+

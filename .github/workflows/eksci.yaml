@@ -1,0 +1,118 @@
+name: CI - Build, Scan & Deploy to EKS via ECR
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    if: "!contains(github.event.head_commit.message, 'Updated image tag')"
+    runs-on: ubuntu-latest
+
+    steps:
+    # ============================
+    # Checkout
+    # ============================
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # =======================
+    # GitLeaks Secret Scanning
+    # =========================
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        fail: true
+
+    # =======================
+    # Sonar Cloud Scan
+    # =========================
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@v2
+      with:
+        args: >
+          -Dsonar.projectKey=akashjaiswal36_CI-Nodejs
+          -Dsonar.organization=akashjaiswal36
+      env:
+        SONAR_TOKEN: ${{ secret.SONAR_TOKEN }}
+
+    # ================================
+    # AWS OIDC Auth
+    # ===========================
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    # =========================
+    # Login to ECR
+    # ==================
+    - name:  Login to AWS ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # =======================
+    # Docker Buildx
+    # =======================
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # ====================
+    # Build and Push to ECR
+    # ======================
+    - name: Build and Push Image to ECR
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push:  true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/devops-akki:${{ github.sha }}
+
+    # ====================
+    # Trivy Scan
+    # =====================
+    - name: Trivy Image Scan (Critical only)
+      run: |
+        trivy image --severity CRITICAL --exit-code 1 \
+        ${{ steps.login-ecr.output.registry }}/devops-akki:${{ github.sha }}
+
+    # ==============
+    # SBOM
+    # =============
+    - name: Generate SBOM
+      run: |
+        trivy image --format cyclonedx --output sbom.json \
+        ${{ steps.login-ecr.output.registry }}/devops-akki:${{ github.sha }}
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: sbom.json
+
+    # =========================
+    # GitOps update & EKS Deploy
+    # ===========================
+    - name: update Gitops repo
+      run: |
+        git config --global user.email "ci-bot@github.com"
+        git config --global user.name "ci-bot"
+
+        git clone https://x-access-token:${{ secrets.GITOPS_REPO_TOKEN }}@github.com/akashjaiswal36/CD-GitOps.git
+        cd CD-GitOps/helm/devops-akki
+
+        sed -i 's/tag:.*/tag: ${{ github.sha }}/' values.yaml
+
+        git add values.yaml
+        git commit -m "update image tag to ${{ GITHUB_SHA }}"
+        git push
+    

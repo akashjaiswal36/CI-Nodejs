@@ -1,13 +1,8 @@
 name: CI - Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'README.md'
-      - 'procedure.txt'
-      - 'procedure1.txt'
+  workflow_dispatch:
+
 
 jobs:
   build:
