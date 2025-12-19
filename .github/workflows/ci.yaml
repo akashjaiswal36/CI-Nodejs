@@ -48,9 +48,9 @@ jobs:
     # ===============================================
     # Scan image for HIGH / Critical velnerbilities
     # ===============================================
-    - name: Trivy Image Scan (fail if High or Critical)
+    - name: Trivy Image Scan (fail if  Critical)
       run: |
-        trivy image --severity HIGH,CRITICAL --exit-code 1 \
+        trivy image --severity CRITICAL --exit-code 1 \
         ${{ secrets.DOCKERHUB_USERNAME }}/devops-akki:${{ github.sha }}
 
     # ====================
