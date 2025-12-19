@@ -94,7 +94,7 @@ jobs:
     - name: Trivy Image Scan (Critical only)
       run: |
         trivy image --severity CRITICAL --exit-code 1 \
-        ${{ steps.login-ecr.output.registry }}/devops-akki:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/devops-akki:${{ github.sha }}
 
     # ==============
     # SBOM
@@ -102,7 +102,7 @@ jobs:
     - name: Generate SBOM
       run: |
         trivy image --format cyclonedx --output sbom.json \
-        ${{ steps.login-ecr.output.registry }}/devops-akki:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/devops-akki:${{ github.sha }}
 
     - name: Upload SBOM
       uses: actions/upload-artifact@v4
