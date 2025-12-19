@@ -41,7 +41,7 @@ jobs:
 
         git clone https://x-access-token:${{ secrets.GITOPS_REPO_TOKEN }}@github.com/akashjaiswal36/CD-GitOps.git
      
-        cd CD-GitOps/apps/helm/devops-akki
+        cd CD-GitOps/helm/devops-akki
 
         sed -i "s/tag:.*/tag: $GITHUB_SHA/" values.yaml
 
