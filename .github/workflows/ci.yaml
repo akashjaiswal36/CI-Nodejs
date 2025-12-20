@@ -103,7 +103,7 @@ jobs:
      
         cd CD-GitOps/helm/devops-akki
 
-        sed -i "s/tag:.*/tag: $GITHUB_SHA/" values.yaml
+        #sed -i "s/tag:.*/tag: $GITHUB_SHA/" values.yaml
         sed -i "s/tag:.*/tag: latest/" values-local.yaml
         sed -i "s/redeployTimestamp:.*/redeployTimestamp: $(date +%s)/" values-local.yaml
 
