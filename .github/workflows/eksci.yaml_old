@@ -1,11 +1,13 @@
 name: CI - Build,Scan & Deploy to EKS via ECR
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - README.md
+  workflow_dispatch:
+# on:
+#  push:
+#    branches:
+#      - main
+#    paths-ignore:
+#      - README.md
 
 permissions:
   id-token: write
