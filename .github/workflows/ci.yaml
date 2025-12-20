@@ -18,9 +18,10 @@ jobs:
     # ===========================
     # Secret Scanning with GitLeaks
     # ============================
-    - name: Run Gitleaks
-      uses: gitleaks/gitleaks-action@v2
+    - name: Run Gitleaks (free version)
+      uses: gitleaks/gitleaks-action@v1
       with:
+        args: detect --source .
         fail: true
 
     # ================================
