@@ -104,7 +104,8 @@ jobs:
         cd CD-GitOps/helm/devops-akki
 
         sed -i "s/tag:.*/tag: $GITHUB_SHA/" values.yaml
-        sed -i "s/tag:.*/tag: latest # redeploy-$(date +%s)/" values-local.yaml
+        sed -i "s/tag:.*/tag: latest/" values-local.yaml
+        echo "redeployTimestamp: $(date +%s)" >> values-local.yaml
 
 
         git add values.yaml values-local.yaml
