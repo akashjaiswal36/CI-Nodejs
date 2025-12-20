@@ -5,7 +5,7 @@ router.get('/', (req, res) => {
   res.send(`
     <html>
       <head>
-        <title>DevOps Platform Demo, ImagePullPolicy: always</title>
+        <title>DevOps Platform Demo, ImagePullPolicy: always..</title>
         <style>
           body { font-family: Arial; background: #eef2f7; padding: 40px; }
           .card {
