@@ -19,7 +19,7 @@ router.get('/', (req, res) => {
       </head>
       <body>
         <div class="card">
-          <h2>🚀 DevOps Platform Demo, Updated value.yaml.WTFFFFFFFF</h2>
+          <h2>🚀 DevOps Platform Demo, Updated value.yaml.NEED TO DO IT AT ANY COST</h2>
           <p><b>Status:</b> UP</p>
           <p><b>Version:</b> ${process.env.APP_VERSION || 'v1'}</p>
           <p><b>Environment:</b> ${process.env.ENV || 'dev'}</p>
