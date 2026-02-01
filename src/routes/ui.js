@@ -19,12 +19,13 @@ router.get('/', (req, res) => {
       </head>
       <body>
         <div class="card">
-          <h2>🚀 DevOps Platform Demo, Updated value.yaml.🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀</h2>
+          <h2>🚀 DevOps Platform Demo, Updated value.yaml.🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀HELLLLLLLOOO</h2>
           <p><b>Status:</b> UP</p>
           <p><b>Version:</b> ${process.env.APP_VERSION || 'v1'}</p>
           <p><b>Environment:</b> ${process.env.ENV || 'dev'}</p>
           <p><b>Pod / Host:</b> ${os.hostname()}</p>
           <p><b>Time:</b> ${new Date().toISOString()}</p>
+          <p><b>CloudFront POP:</b> ${req.headers['x-amz-cf-pop'] || 'unknown'}</p>
         </div>
       </body>
     </html>
